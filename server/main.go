@@ -4,6 +4,7 @@ import (
 	. "acaibird.com/zaplog"
 	"github.com/fatih/color"
 	"go.uber.org/zap"
+	"io"
 	"net"
 )
 
@@ -43,12 +44,15 @@ func handleConn(conn net.Conn) {
 		buf := make([]byte, 1024)
 		n, err := conn.Read(buf)
 		if err != nil {
+			if err == io.EOF {
+				return
+			}
 			Logger.Error("read error:", zap.Error(err))
 			return
 		}
 
 		// 打印消息
-		color.Blue("收到客户端消息:", string(buf[:n]))
+		color.Blue("收到客户端消息:%s\n", string(buf[:n]))
 
 		// 发送消息
 		_, err = conn.Write([]byte("hello world"))
