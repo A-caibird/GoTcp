@@ -1,7 +1,10 @@
 package main
 
 import (
+	. "acaibird.com/zaplog"
 	"fmt"
+	"github.com/fatih/color"
+	"go.uber.org/zap"
 	"net"
 )
 
@@ -10,14 +13,21 @@ func main() {
 	conn, err := net.Dial("tcp", "localhost:8080")
 	if err != nil {
 		fmt.Println("dial error:", err)
+		Logger.Error("服务器连接异常", zap.Error(err))
 		return
 	}
-	defer conn.Close()
+
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+			Logger.Error("客户端关闭异常", zap.Error(err))
+		}
+	}(conn)
 
 	// 发送消息
 	_, err = conn.Write([]byte("hello world"))
 	if err != nil {
-		fmt.Println("write error:", err)
+		Logger.Error("客户端发送消息失败", zap.Error(err))
 		return
 	}
 
@@ -25,10 +35,10 @@ func main() {
 	buf := make([]byte, 1024)
 	n, err := conn.Read(buf)
 	if err != nil {
-		fmt.Println("read error:", err)
+		Logger.Error("客户端接受消息异常", zap.Error(err))
 		return
 	}
 
 	// 打印消息
-	fmt.Println("收到消息:", string(buf[:n]))
+	color.Yellow("收到消息:", string(buf[:n]))
 }

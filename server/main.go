@@ -1,7 +1,9 @@
 package main
 
 import (
-	"fmt"
+	. "acaibird.com/zaplog"
+	"github.com/fatih/color"
+	"go.uber.org/zap"
 	"net"
 )
 
@@ -9,7 +11,7 @@ func main() {
 	// 监听端口
 	listener, err := net.Listen("tcp", ":8080")
 	if err != nil {
-		fmt.Println("listen error:", err)
+		Logger.Error("服务器监听端口异常:", zap.Error(err))
 		return
 	}
 	defer listener.Close()
@@ -18,7 +20,7 @@ func main() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("accept error:", err)
+			Logger.Error("accept error:", zap.Error(err))
 			continue
 		}
 
@@ -41,17 +43,17 @@ func handleConn(conn net.Conn) {
 		buf := make([]byte, 1024)
 		n, err := conn.Read(buf)
 		if err != nil {
-			fmt.Println("read error:", err)
+			Logger.Error("read error:", zap.Error(err))
 			return
 		}
 
 		// 打印消息
-		fmt.Println("收到消息:", string(buf[:n]))
+		color.Blue("收到客户端消息:", string(buf[:n]))
 
 		// 发送消息
 		_, err = conn.Write([]byte("hello world"))
 		if err != nil {
-			fmt.Println("write error:", err)
+			Logger.Error("推送消息失败:", zap.Error(err))
 			return
 		}
 	}

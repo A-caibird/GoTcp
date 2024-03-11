@@ -5,4 +5,5 @@ use (
 ./client/A
 ./client/B
 ./server
+./log
 )
