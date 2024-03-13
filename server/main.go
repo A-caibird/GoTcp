@@ -1,7 +1,9 @@
 package main
 
 import (
+	. "acaibird.com/meassege"
 	. "acaibird.com/zaplog"
+	"encoding/json"
 	"github.com/fatih/color"
 	"go.uber.org/zap"
 	"io"
@@ -50,12 +52,19 @@ func handleConn(conn net.Conn) {
 			Logger.Error("read error:", zap.Error(err))
 			return
 		}
-
+		var msgReceive TextMsg
+		err = json.Unmarshal(buf[:n], &msgReceive)
 		// 打印消息
-		color.Blue("收到客户端消息:%s\n", string(buf[:n]))
+		color.Blue("收到客户端消息:%#v", msgReceive)
 
 		// 发送消息
-		_, err = conn.Write([]byte("hello world"))
+		message := TextMsg{
+			Sender:   "me",
+			Receiver: "you",
+			Content:  "hello world",
+		}
+		msg, _ := json.Marshal(message)
+		_, err = conn.Write(msg)
 		if err != nil {
 			Logger.Error("推送消息失败:", zap.Error(err))
 			return

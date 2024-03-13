@@ -6,4 +6,5 @@ use (
 ./client/B
 ./server
 ./log
+./meassege
 )
