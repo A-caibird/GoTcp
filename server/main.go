@@ -38,32 +38,53 @@ func handleConn(conn net.Conn) {
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
-
+			Logger.Error("断开与客户端链接异常:", zap.Error(err))
 		}
+		Logger.Info("客户端断开链接,goroutine退出!")
 	}(conn)
 
 	for {
 		// 获取消息长度
-		buf := make([]byte, 8)
-		n, err := conn.Read(buf)
-		if err != nil && err != io.EOF {
-
-			Logger.Error("获取客户端消息字节长度错误:", zap.Error(err))
+		lens, err := getMsgLength(conn)
+		if err != nil {
 			return
 		}
-		lens := binary.BigEndian.Uint64(buf[:n])
 
-		// 获取消息
-		buf = make([]byte, lens)
-		n, err = conn.Read(buf)
-		if err != nil {
-			Logger.Error("read error:", zap.Error(err))
-		}
+		// 获取消息字节数组
+		byteMsg, err := getMsgBytesContent(conn, lens)
 
+		// 消息解析
 		var msgReceive message.TextMsg
-		err = json.Unmarshal(buf[:n], &msgReceive)
+		err = json.Unmarshal(byteMsg[:lens], &msgReceive)
 		color.Blue("收到客户端消息:%#v", msgReceive)
 		return
 	}
-	// TODO: 当客户端关闭没有发送消息的时候应该怎么办
+}
+
+func getMsgLength(conn net.Conn) (uint64, error) {
+	buf := make([]byte, 8)
+	n, err := conn.Read(buf)
+	if err != nil {
+		if err == net.ErrClosed {
+			Logger.Error("客户端关闭异常:", zap.Error(err))
+			return 0, err
+		} else if err == io.EOF {
+			Logger.Error("客户端关闭异常:", zap.Error(err))
+			return 0, err
+		} else {
+			Logger.Error("客户端读取消息长度错误:", zap.Error(err))
+			return 0, err
+		}
+	}
+	lens := binary.BigEndian.Uint64(buf[:n])
+	return lens, nil
+}
+
+func getMsgBytesContent(conn net.Conn, lens uint64) ([]byte, error) {
+	buf := make([]byte, lens)
+	n, err := conn.Read(buf)
+	if err != nil {
+		Logger.Error("read error:", zap.Error(err))
+	}
+	return buf[:n], err
 }
