@@ -63,6 +63,7 @@ func handleConn(conn net.Conn) {
 		var msgReceive message.TextMsg
 		err = json.Unmarshal(buf[:n], &msgReceive)
 		color.Blue("收到客户端消息:%#v", msgReceive)
+		return
 	}
 	// TODO: 当客户端关闭没有发送消息的时候应该怎么办
 }
