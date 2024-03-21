@@ -1,8 +1,8 @@
 package main
 
 import (
-	. "acaibird.com/meassege"
-	. "acaibird.com/zaplog"
+	. "acaibird.com/clientB/log"
+	. "acaibird.com/clientB/message"
 	"encoding/json"
 	"fmt"
 	"github.com/fatih/color"
@@ -25,19 +25,6 @@ func main() {
 			Logger.Error("客户端关闭异常", zap.Error(err))
 		}
 	}(conn)
-
-	// 发送消息
-	message := TextMsg{
-		Sender:   "me",
-		Receiver: "you",
-		Content:  "hello world",
-	}
-	msg, _ := json.Marshal(message)
-	_, err = conn.Write(msg)
-	if err != nil {
-		Logger.Error("客户端发送消息失败", zap.Error(err))
-		return
-	}
 
 	// 接收消息
 	buf := make([]byte, 1024)

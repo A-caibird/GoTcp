@@ -1,8 +1,9 @@
 package main
 
 import (
-	. "acaibird.com/meassege"
-	. "acaibird.com/zaplog"
+	. "acaibird.com/server/log"
+	"acaibird.com/server/message"
+	"encoding/binary"
 	"encoding/json"
 	"github.com/fatih/color"
 	"go.uber.org/zap"
@@ -12,7 +13,7 @@ import (
 
 func main() {
 	// 监听端口
-	listener, err := net.Listen("tcp", ":8080")
+	listener, err := net.Listen("tcp", ":8081")
 	if err != nil {
 		Logger.Error("服务器监听端口异常:", zap.Error(err))
 		return
@@ -41,33 +42,27 @@ func handleConn(conn net.Conn) {
 		}
 	}(conn)
 
-	// 接收消息
 	for {
-		buf := make([]byte, 1024)
+		// 获取消息长度
+		buf := make([]byte, 8)
 		n, err := conn.Read(buf)
-		if err != nil {
-			if err == io.EOF {
-				return
-			}
-			Logger.Error("read error:", zap.Error(err))
-			return
-		}
-		var msgReceive TextMsg
-		err = json.Unmarshal(buf[:n], &msgReceive)
-		// 打印消息
-		color.Blue("收到客户端消息:%#v", msgReceive)
+		if err != nil && err != io.EOF {
 
-		// 发送消息
-		message := TextMsg{
-			Sender:   "me",
-			Receiver: "you",
-			Content:  "hello world",
-		}
-		msg, _ := json.Marshal(message)
-		_, err = conn.Write(msg)
-		if err != nil {
-			Logger.Error("推送消息失败:", zap.Error(err))
+			Logger.Error("获取客户端消息字节长度错误:", zap.Error(err))
 			return
 		}
+		lens := binary.BigEndian.Uint64(buf[:n])
+
+		// 获取消息
+		buf = make([]byte, lens)
+		n, err = conn.Read(buf)
+		if err != nil {
+			Logger.Error("read error:", zap.Error(err))
+		}
+
+		var msgReceive message.TextMsg
+		err = json.Unmarshal(buf[:n], &msgReceive)
+		color.Blue("收到客户端消息:%#v", msgReceive)
 	}
+	// TODO: 当客户端关闭没有发送消息的时候应该怎么办
 }

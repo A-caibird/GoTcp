@@ -1,18 +1,19 @@
 package main
 
 import (
-	. "acaibird.com/meassege"
-	. "acaibird.com/zaplog"
+	. "acaibird.com/clientA/log"
+	"acaibird.com/clientA/message"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/fatih/color"
 	"go.uber.org/zap"
 	"net"
+	"time"
 )
 
 func main() {
 	// 连接服务器
-	conn, err := net.Dial("tcp", "localhost:8080")
+	conn, err := net.Dial("tcp", "localhost:8081")
 	if err != nil {
 		fmt.Println("dial error:", err)
 		Logger.Error("服务器连接异常", zap.Error(err))
@@ -26,29 +27,21 @@ func main() {
 		}
 	}(conn)
 
-	// 发送消息
-	message := TextMsg{
-		Sender:   "me",
-		Receiver: "you",
-		Content:  "hello world",
-	}
-	msg, _ := json.Marshal(message)
-	_, err = conn.Write(msg)
-	if err != nil {
-		Logger.Error("客户端发送消息失败", zap.Error(err))
-		return
-	}
+	// 发送验证消息
 
-	// 接收消息
-	buf := make([]byte, 1024)
-	n, err := conn.Read(buf)
-	if err != nil {
-		Logger.Error("客户端接受消息异常", zap.Error(err))
-		return
+	login := message.TextMsg{
+		Type:     "login",
+		Sender:   "A",
+		Receiver: "server",
+		Content:  "client login",
+		Time:     time.Now(),
 	}
+	jsonLogin, _ := json.Marshal(login)
 
-	// 打印消息
-	var msgReceive TextMsg
-	err = json.Unmarshal(buf[:n], &msgReceive)
-	color.Yellow("收到消息:%#v", msgReceive)
+	// 消息长度
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, uint64(len(jsonLogin)))
+	_, err = conn.Write(buf)       // 发送消息长度
+	_, err = conn.Write(jsonLogin) // 发送消息内容
+
 }
