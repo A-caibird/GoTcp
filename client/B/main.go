@@ -43,19 +43,21 @@ func main() {
 	_, err = conn.Write(jsonLogin) // 发送消息内容
 
 	// 接收消息
-	buf = make([]byte, 8)
-	n, err := conn.Read(buf)
-	if err != nil {
-		Logger.Error("客户端接受消息长度异常", zap.Error(err))
-		return
+	for {
+
+		buf = make([]byte, 8)
+		n, err := conn.Read(buf) // 阻塞当前线程
+		if err != nil {
+			Logger.Error("客户端接受消息长度异常", zap.Error(err))
+			return
+		}
+		lens := binary.BigEndian.Uint64(buf[:n])
+
+		// 接收消息内容
+		buf = make([]byte, lens)
+		n, err = conn.Read(buf) // 收到消息
+		var msgReceive message.TextMsg
+		err = json.Unmarshal(buf[:n], &msgReceive)
+		color.Yellow("收到消息:%#v", msgReceive)
 	}
-	lens := binary.BigEndian.Uint64(buf[:n])
-
-	// 接收消息内容
-	buf = make([]byte, lens)
-	n, err = conn.Read(buf) // 收到消息
-	var msgReceive message.TextMsg
-	err = json.Unmarshal(buf[:n], &msgReceive)
-
-	color.Yellow("收到消息:%#v", msgReceive)
 }

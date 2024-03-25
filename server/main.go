@@ -132,7 +132,7 @@ func getMsgLength(conn net.Conn) (uint64, error) {
 			Logger.Error("客户端关闭异常:", zap.Error(err))
 			return 0, err
 		} else if err == io.EOF {
-			Logger.Error("客户端关闭异常:", zap.Error(err))
+			Logger.Error("读取错误长度的客户端消息:", zap.Error(err))
 			return 0, err
 		} else {
 			Logger.Error("客户端读取消息长度错误:", zap.Error(err))
