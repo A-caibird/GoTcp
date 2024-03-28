@@ -1,6 +1,10 @@
 package message
 
-import "time"
+import (
+	mysqlDB "acaibird.com/server/mysql"
+	"errors"
+	"time"
+)
 
 type MSG interface {
 	getSender() string
@@ -24,4 +28,40 @@ func (t TextMsg) GetReceiver() string {
 
 func (t TextMsg) GetContent() string {
 	return t.Content
+}
+
+func (t TextMsg) WriteToDB(errCh chan error) {
+	db, err := mysqlDB.InitDB()
+	if err != nil {
+		errCh <- errors.New("数据库连接异常")
+		return
+	}
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			return
+		}
+	}()
+
+	// 准备 SQL 语句
+	stmt, err := db.Prepare("INSERT INTO text_msgs (type, sender, receiver, content, time) VALUES (?, ?, ?, ?, ?)")
+	if err != nil {
+		errCh <- errors.New("数据库准备 SQL 语句异常")
+		return
+	}
+	defer func() {
+		err := stmt.Close()
+		if err != nil {
+			return
+		}
+
+	}()
+
+	// 执行 SQL 语句
+	_, err = stmt.Exec(t.Type, t.Sender, t.Receiver, t.Content, t.Time)
+	if err != nil {
+		errCh <- errors.New("数据库执行 SQL 语句异常")
+		return
+	}
+	errCh <- nil
 }

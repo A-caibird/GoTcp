@@ -51,10 +51,6 @@ func handleConn(conn net.Conn) {
 			Logger.Error("断开与客户端链接异常:", zap.Error(err))
 		}
 		Logger.Info("客户端断开链接,goroutine退出!")
-		for v, i := range MapUserMsg {
-			fmt.Printf("用户:%s,消息:%#v\n", v, i)
-		}
-
 	}(conn)
 
 	for {
@@ -74,7 +70,6 @@ func handleConn(conn net.Conn) {
 			Logger.Error("消息解析异常:", zap.Error(err))
 			return
 		}
-		fmt.Printf("%#v\n", msgReceive)
 
 		// 登录信息处理
 		if msgReceive.Type == "login" {
@@ -97,13 +92,26 @@ func handleConn(conn net.Conn) {
 		if _, ok := MapUserConn[msgReceive.Receiver]; !ok {
 			// 用户不在线,存储消息
 			MapUserMsg[msgReceive.Receiver] = msgReceive
-			fmt.Printf("用户%s不在线,存储消息:  \n", msgReceive.Receiver)
+
+			errCh := make(chan error)
+			go msgReceive.WriteToDB(errCh)
+			err := <-errCh
+			switch {
+			case err == nil:
+				fmt.Printf("用户%s不在线,存储消息成功!\n", msgReceive.Receiver)
+			case errors.Is(err, errors.New("数据库连接异常")):
+				fmt.Println("数据库连接异常!")
+			case errors.Is(err, errors.New("数据库准备 SQL 语句异常")):
+				fmt.Println("数据库准备 SQL 语句异常!")
+			case errors.Is(err, errors.New("数据库执行 SQL 语句异常")):
+				fmt.Println("数据库执行 SQL 语句异常!")
+			}
 		} else {
 			// 用户在线,发送消息
-			_, err2 := MapUserConn[msgReceive.Receiver].Write(byteMsg[:lens])
-			if err2 != nil {
-				return
-			}
+			//_, err2 := MapUserConn[msgReceive.Receiver].Write(byteMsg[:lens])
+			//if err2 != nil {
+			//	return
+			//}
 		}
 		return
 	}
@@ -139,16 +147,17 @@ func getMsgLength(conn net.Conn) (uint64, error) {
 			return 0, err
 		}
 	}
+	// 读取到的字节数
 	lens := binary.BigEndian.Uint64(buf[:n])
 	return lens, nil
 }
 
 func getMsgBytesContent(conn net.Conn, lens uint64) ([]byte, error) {
 	buf := make([]byte, lens)
+	// n 为读取到的字节数
 	n, err := conn.Read(buf)
 	if err != nil {
 		Logger.Error("read error:", zap.Error(err))
 	}
-	//fmt.Println("接收到消息长度:", n)
 	return buf[:n], err
 }
