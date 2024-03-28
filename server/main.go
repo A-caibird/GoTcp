@@ -83,19 +83,10 @@ func handleConn(conn net.Conn) {
 				color.Blue("%#v\n", v)
 				if v.Receiver == msgReceive.Sender {
 					SendOfflineTextMsg(conn, v)
-					//TODO delete(MapUserMsg, v)
 					err := DelOfflineTextMsg(v.Receiver)
-					if err != nil {
-						switch {
-						case errors.Is(err, nil):
-							fmt.Printf("用户%s离线消息删除成功!\n", v.Receiver)
-						case errors.Is(err, errors.New("数据库连接异常")):
-							fmt.Println("数据库连接异常!")
-						case errors.Is(err, errors.New("数据库准备 SQL 语句异常")):
-							fmt.Println("数据库准备 SQL 语句异常!")
-						case errors.Is(err, errors.New("数据库执行 SQL 语句异常")):
-							fmt.Println("数据库执行 SQL 语句异常!")
-						}
+					err = mysqlDB.DBError(err)
+					if err == nil {
+						Logger.Info("离线消息推送成功、删除离线消息成功!", zap.Error(err))
 					}
 				}
 			}
@@ -105,22 +96,14 @@ func handleConn(conn net.Conn) {
 		if _, ok := MapUserConn[msgReceive.Receiver]; !ok {
 			// 用户不在线,存储消息
 			err = msgReceive.WriteToDB()
-			if err != nil {
-				switch {
-				case errors.Is(err, nil):
-					fmt.Printf("用户%s不在线,存储消息成功!\n", msgReceive.Receiver)
-				case errors.Is(err, errors.New("数据库连接异常")):
-					fmt.Println("数据库连接异常!")
-				case errors.Is(err, errors.New("数据库准备 SQL 语句异常")):
-					fmt.Println("数据库准备 SQL 语句异常!")
-				case errors.Is(err, errors.New("数据库执行 SQL 语句异常")):
-					fmt.Println("数据库执行 SQL 语句异常!")
-				}
+			err = mysqlDB.DBError(err)
+			if err == nil {
+				Logger.Info("消息存储成功!", zap.Error(err))
 			}
 		} else {
 			//用户在线,发送消息
-			_, err2 := MapUserConn[msgReceive.Receiver].Write(byteMsg[:lens])
-			if err2 != nil {
+			_, err := MapUserConn[msgReceive.Receiver].Write(byteMsg[:lens])
+			if err != nil {
 				return
 			}
 		}
