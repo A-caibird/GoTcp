@@ -3,7 +3,7 @@ package main
 import (
 	. "acaibird.com/server/log"
 	"acaibird.com/server/message"
-	mysqlDB "acaibird.com/server/mysql"
+	"acaibird.com/server/mysql"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	MapUserMsg  = make(map[string]message.TextMsg)
 	MapUserConn = make(map[string]net.Conn)
 )
 
@@ -85,6 +84,19 @@ func handleConn(conn net.Conn) {
 				if v.Receiver == msgReceive.Sender {
 					SendOfflineTextMsg(conn, v)
 					//TODO delete(MapUserMsg, v)
+					err := DelOfflineTextMsg(v.Receiver)
+					if err != nil {
+						switch {
+						case errors.Is(err, nil):
+							fmt.Printf("用户%s离线消息删除成功!\n", v.Receiver)
+						case errors.Is(err, errors.New("数据库连接异常")):
+							fmt.Println("数据库连接异常!")
+						case errors.Is(err, errors.New("数据库准备 SQL 语句异常")):
+							fmt.Println("数据库准备 SQL 语句异常!")
+						case errors.Is(err, errors.New("数据库执行 SQL 语句异常")):
+							fmt.Println("数据库执行 SQL 语句异常!")
+						}
+					}
 				}
 			}
 			continue
@@ -175,6 +187,36 @@ func ReadTextMsgFromDB(receiver string) (msgs []message.TextMsg, err error) {
 		}
 	}
 	return msgs, nil
+}
+
+func DelOfflineTextMsg(receiver string) (err error) {
+	db, err := mysqlDB.InitDB()
+	if err != nil {
+		return errors.New("数据库连接异常")
+	}
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			return // 如果数据库关闭失败,也返回了对应的err
+		}
+
+	}()
+	stmt, err := db.Prepare("DELETE FROM text_msgs WHERE receiver = ?")
+	if err != nil {
+		return errors.New("数据库准备 SQL 语句异常")
+
+	}
+	defer func() {
+		err = stmt.Close()
+		if err != nil {
+			return
+		}
+	}()
+	_, err = stmt.Exec(receiver)
+	if err != nil {
+		return errors.New("数据库执行 SQL 语句异常")
+	}
+	return err
 }
 
 func GetMsgLength(conn net.Conn) (uint64, error) {
