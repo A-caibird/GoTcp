@@ -22,7 +22,7 @@ func main() {
 	// 监听端口
 	listener, err := net.Listen("tcp", ":8081")
 	if err != nil {
-		Logger.Error("服务器监听端口异常:", zap.Error(err))
+		Logger.Error("Server listening port exception:", zap.Error(err))
 		return
 	}
 	defer func(listener net.Listener) {
@@ -35,7 +35,7 @@ func main() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			Logger.Error("accept error:", zap.Error(err))
+			Logger.Error("Server accepts client connection error:", zap.Error(err))
 			continue
 		}
 
@@ -46,38 +46,39 @@ func main() {
 
 // 处理连接
 func handleConn(conn net.Conn) {
-	var name string
+	var client string
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
-			Logger.Error("断开与客户端链接异常:", zap.Error(err))
+			Logger.Error("An exception occurred while server trying to disconnect the client connection:", zap.Error(err), zap.String("client", client))
 		}
-		Logger.Info("客户端断开链接,goroutine退出!", zap.String("name", name))
+		delete(MapUserConn, client)
+		Logger.Info("Client disconnect with Server,goroutine exit!", zap.String("client", client))
 	}(conn)
 
 	for {
 		// 获取消息长度
-		lens, err := GetMsgLength(conn)
+		lens, lenBytes, err := GetMsgLength(conn, client)
 		if err != nil {
 			return
 		}
 
 		// 获取消息字节数组
-		byteMsg, err := GetMsgBytesContent(conn, lens)
+		byteMsg, err := GetMsgBytesContent(conn, lens, client)
 
 		// 消息解析
 		var msgReceive message.TextMsg
 		err = json.Unmarshal(byteMsg[:lens], &msgReceive)
 		if err != nil {
-			Logger.Error("消息解析异常:", zap.Error(err))
+			Logger.Error("Client message parsing failed:", zap.Error(err), zap.String("client", client))
 			return
 		}
 
 		// 登录信息处理
 		if msgReceive.Type == "login" {
 			MapUserConn[msgReceive.Sender] = conn
-			name = msgReceive.Sender
-			fmt.Printf("用户%s上线\n", msgReceive.Sender)
+			client = msgReceive.Sender
+			fmt.Printf("User %s log in\n", msgReceive.Sender)
 
 			// 发送离线消息
 			msgs, _ := ReadTextMsgFromDB(msgReceive.Sender)
@@ -88,7 +89,7 @@ func handleConn(conn net.Conn) {
 					err := DelOfflineTextMsg(v.Receiver)
 					err = mysqlDB.DBError(err)
 					if err == nil {
-						Logger.Info("离线消息推送成功、删除离线消息成功!", zap.Error(err))
+						Logger.Info("Successfully pushed offline messages to the client, deleted offline messages successfully!", zap.Error(err), zap.String("client and receiver", client))
 					}
 				}
 			}
@@ -100,12 +101,14 @@ func handleConn(conn net.Conn) {
 			err = msgReceive.WriteToDB()
 			err = mysqlDB.DBError(err)
 			if err == nil {
-				Logger.Info("消息存储成功!", zap.Error(err))
+				Logger.Info("Offline messages stored to the database successfully!", zap.Error(err), zap.String("from", msgReceive.Sender), zap.String("to", msgReceive.Receiver))
 			}
 		} else {
 			//用户在线,发送消息
-			_, err := MapUserConn[msgReceive.Receiver].Write(byteMsg[:lens])
+			_, err := MapUserConn[msgReceive.Receiver].Write(lenBytes)
+			_, err = MapUserConn[msgReceive.Receiver].Write(byteMsg[:lens])
 			if err != nil {
+				Logger.Error("Message recipient is online, server push message exception:", zap.Error(err), zap.String("from", msgReceive.Sender), zap.String("to", msgReceive.Receiver))
 				return
 			}
 		}
@@ -131,7 +134,7 @@ func SendOfflineTextMsg(conn net.Conn, msg message.TextMsg) {
 func ReadTextMsgFromDB(receiver string) (msgs []message.TextMsg, err error) {
 	db, err := mysqlDB.InitDB()
 	if err != nil {
-		return nil, errors.New("数据库连接异常")
+		return nil, errors.New("database connection exception")
 	}
 	defer func() {
 		err = db.Close()
@@ -143,7 +146,7 @@ func ReadTextMsgFromDB(receiver string) (msgs []message.TextMsg, err error) {
 	// 准备 SQL 语句
 	stmt, err := db.Prepare("SELECT type, sender, receiver, content, time FROM text_msgs WHERE receiver = ?")
 	if err != nil {
-		return nil, errors.New("数据库准备 SQL 语句异常")
+		return nil, errors.New("pre-execute SQL statement exception")
 	}
 	defer func() {
 		err = stmt.Close()
@@ -155,7 +158,7 @@ func ReadTextMsgFromDB(receiver string) (msgs []message.TextMsg, err error) {
 	// 执行 SQL 语句
 	rows, err := stmt.Query(receiver)
 	if err != nil {
-		return nil, errors.New("数据库执行 SQL 语句异常")
+		return nil, errors.New("database executes SQL statement exception")
 	}
 	defer func() {
 		err = rows.Close()
@@ -177,7 +180,7 @@ func ReadTextMsgFromDB(receiver string) (msgs []message.TextMsg, err error) {
 func DelOfflineTextMsg(receiver string) (err error) {
 	db, err := mysqlDB.InitDB()
 	if err != nil {
-		return errors.New("数据库连接异常")
+		return errors.New("database connection exception")
 	}
 	defer func() {
 		err = db.Close()
@@ -188,7 +191,7 @@ func DelOfflineTextMsg(receiver string) (err error) {
 	}()
 	stmt, err := db.Prepare("DELETE FROM text_msgs WHERE receiver = ?")
 	if err != nil {
-		return errors.New("数据库准备 SQL 语句异常")
+		return errors.New("pre-execute SQL statement exception")
 
 	}
 	defer func() {
@@ -199,37 +202,37 @@ func DelOfflineTextMsg(receiver string) (err error) {
 	}()
 	_, err = stmt.Exec(receiver)
 	if err != nil {
-		return errors.New("数据库执行 SQL 语句异常")
+		return errors.New("database executes SQL statement exception")
 	}
 	return err
 }
 
-func GetMsgLength(conn net.Conn) (uint64, error) {
+func GetMsgLength(conn net.Conn, name string) (uint64, []byte, error) {
 	buf := make([]byte, 8)
 	n, err := conn.Read(buf)
 	if err != nil {
 		if errors.Is(err, net.ErrClosed) {
-			Logger.Error("客户端关闭异常:", zap.Error(err))
-			return 0, err
+			Logger.Error("An exception occurred when client close ", zap.Error(err), zap.String("client", name))
+			return 0, nil, err
 		} else if err == io.EOF {
-			Logger.Error("读取错误长度的客户端消息:", zap.Error(err))
-			return 0, err
+			Logger.Error("Read client message with incorrect length:", zap.Error(err), zap.String("client", name))
+			return 0, nil, err
 		} else {
-			Logger.Error("客户端读取消息长度错误:", zap.Error(err))
-			return 0, err
+			Logger.Error("Read client message with incorrect length:", zap.Error(err), zap.String("client", name))
+			return 0, nil, err
 		}
 	}
 	// 读取到的字节数
 	lens := binary.BigEndian.Uint64(buf[:n])
-	return lens, nil
+	return lens, buf, nil
 }
 
-func GetMsgBytesContent(conn net.Conn, lens uint64) ([]byte, error) {
+func GetMsgBytesContent(conn net.Conn, lens uint64, name string) ([]byte, error) {
 	buf := make([]byte, lens)
 	// n 为读取到的字节数
 	n, err := conn.Read(buf)
 	if err != nil {
-		Logger.Error("read error:", zap.Error(err))
+		Logger.Error("Read Message(type:[]byte) error:", zap.Error(err))
 	}
 	return buf[:n], err
 }

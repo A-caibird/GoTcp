@@ -22,12 +22,12 @@ func InitDB() (db *sql.DB, err error) {
 func DBError(err error) error {
 	if err != nil {
 		switch {
-		case errors.Is(err, errors.New("数据库连接异常")):
-			fmt.Println("数据库连接异常!")
-		case errors.Is(err, errors.New("数据库准备 SQL 语句异常")):
-			fmt.Println("数据库准备 SQL 语句异常!")
+		case errors.Is(err, errors.New("database connection exception")):
+			fmt.Println("database connection exception!")
+		case errors.Is(err, errors.New("pre-execute SQL statement exception")):
+			fmt.Println("pre-execute SQL statement exception!")
 		case errors.Is(err, errors.New("数据库执行 SQL 语句异常")):
-			fmt.Println("数据库执行 SQL 语句异常!")
+			fmt.Println("database executes SQL statement exception!")
 		}
 		return err
 	}

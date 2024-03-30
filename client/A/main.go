@@ -6,10 +6,12 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/fatih/color"
 	"go.uber.org/zap"
 	"html/template"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -64,33 +66,6 @@ func main() {
 	os.Exit(0)
 }
 
-func SendTextMsg(conn net.Conn) {
-	msg := message.TextMsg{
-		Type:     "text",
-		Sender:   "A",
-		Receiver: "B",
-		Time:     time.Now(),
-	}
-
-	fmt.Printf("请输入接受者:\n")
-	_, _ = fmt.Scanln(&msg.Receiver)
-	fmt.Printf("请输入消息内容:\n")
-	_, _ = fmt.Scanln(&msg.Content)
-
-	buf := make([]byte, 8)
-	jsonMsg, _ := json.Marshal(msg)
-	binary.BigEndian.PutUint64(buf, uint64(len(jsonMsg)))
-
-	// 消息长度:字节数组
-	_, err := conn.Write(buf)
-
-	// 消息内容:字节数组
-	_, err = conn.Write(jsonMsg)
-	if err != nil {
-		return
-	}
-}
-
 func SendMessage(conn net.Conn, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
@@ -140,13 +115,50 @@ func SendMessage(conn net.Conn, wg *sync.WaitGroup) {
 	}
 }
 
+func SendTextMsg(conn net.Conn) {
+	msg := message.TextMsg{
+		Type:     "text",
+		Sender:   "A",
+		Receiver: "B",
+		Time:     time.Now(),
+	}
+
+	fmt.Printf("请输入接受者:\n")
+	_, _ = fmt.Scanln(&msg.Receiver)
+	fmt.Printf("请输入消息内容:\n")
+	_, _ = fmt.Scanln(&msg.Content)
+
+	buf := make([]byte, 8)
+	jsonMsg, err := json.Marshal(msg)
+	if err != nil {
+		Logger.Error("A客户端发送消息,转化为json异常!", zap.Error(err))
+		return
+	}
+	binary.BigEndian.PutUint64(buf, uint64(len(jsonMsg)))
+
+	// 消息长度:字节数组
+	_, err = conn.Write(buf)
+
+	// 消息内容:字节数组
+	_, err = conn.Write(jsonMsg)
+	if err != nil {
+		return
+	}
+}
+
 func ReceiveMessage(conn net.Conn, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
 		buf := make([]byte, 8)
 		_, err := conn.Read(buf)
 		if err != nil {
-			return
+			if errors.Is(err, net.ErrClosed) {
+				Logger.Info("disconnect server!", zap.Error(err))
+				return
+			} else if errors.Is(err, io.EOF) {
+				//Logger.Error("No more messages for now!", zap.Error(err))
+				continue
+			}
 		}
 		lens := binary.BigEndian.Uint64(buf)
 		var msg message.TextMsg
