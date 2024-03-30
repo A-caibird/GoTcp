@@ -46,12 +46,13 @@ func main() {
 
 // 处理连接
 func handleConn(conn net.Conn) {
+	var name string
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
 			Logger.Error("断开与客户端链接异常:", zap.Error(err))
 		}
-		Logger.Info("客户端断开链接,goroutine退出!")
+		Logger.Info("客户端断开链接,goroutine退出!", zap.String("name", name))
 	}(conn)
 
 	for {
@@ -75,6 +76,7 @@ func handleConn(conn net.Conn) {
 		// 登录信息处理
 		if msgReceive.Type == "login" {
 			MapUserConn[msgReceive.Sender] = conn
+			name = msgReceive.Sender
 			fmt.Printf("用户%s上线\n", msgReceive.Sender)
 
 			// 发送离线消息

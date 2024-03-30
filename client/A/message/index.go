@@ -25,3 +25,8 @@ func (t TextMsg) GetReceiver() string {
 func (t TextMsg) GetContent() string {
 	return t.Content
 }
+
+type MessageType struct {
+	Index int
+	Name  string
+}
