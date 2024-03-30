@@ -16,7 +16,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -34,6 +33,7 @@ func main() {
 		if err != nil {
 			Logger.Error("客户端关闭异常!", zap.Error(err))
 		}
+		os.Exit(0)
 	}(conn)
 	// 发送验证消息
 	login := message.TextMsg{
@@ -51,23 +51,15 @@ func main() {
 	_, err = conn.Write(buf)       // 发送消息长度
 	_, err = conn.Write(jsonLogin) // 发送消息内容
 
-	var wg sync.WaitGroup
-
-	// A发送消息
-	wg.Add(1)
-	go SendMessage(conn, &wg)
-
-	// A接受消息
-	wg.Add(1)
-	go ReceiveMessage(conn, &wg)
-
-	// 退出
-	wg.Wait()
-	os.Exit(0)
+	for {
+		ch := make(chan int, 1)
+		go SendMessage(conn, &ch)
+		go ReceiveMessage(conn)
+		select {}
+	}
 }
 
-func SendMessage(conn net.Conn, wg *sync.WaitGroup) {
-	defer wg.Done()
+func SendMessage(conn net.Conn, ch *chan int) {
 	for {
 		fmt.Printf("是否需要发送消息(y/n):  ")
 		var input string
@@ -78,6 +70,7 @@ func SendMessage(conn net.Conn, wg *sync.WaitGroup) {
 		}
 		if input == "n" {
 			fmt.Println("退出消息发送!")
+			*ch <- 1
 			return // 退出
 		}
 
@@ -146,8 +139,7 @@ func SendTextMsg(conn net.Conn) {
 	}
 }
 
-func ReceiveMessage(conn net.Conn, wg *sync.WaitGroup) {
-	defer wg.Done()
+func ReceiveMessage(conn net.Conn) {
 	for {
 		buf := make([]byte, 8)
 		_, err := conn.Read(buf)

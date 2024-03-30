@@ -65,13 +65,16 @@ func handleConn(conn net.Conn) {
 
 		// 获取消息字节数组
 		byteMsg, err := GetMsgBytesContent(conn, lens, client)
+		if err != nil {
+			return
+		}
 
 		// 消息解析
 		var msgReceive message.TextMsg
 		err = json.Unmarshal(byteMsg[:lens], &msgReceive)
 		if err != nil {
 			Logger.Error("Client message parsing failed:", zap.Error(err), zap.String("client", client))
-			return
+			continue
 		}
 
 		// 登录信息处理
@@ -109,10 +112,8 @@ func handleConn(conn net.Conn) {
 			_, err = MapUserConn[msgReceive.Receiver].Write(byteMsg[:lens])
 			if err != nil {
 				Logger.Error("Message recipient is online, server push message exception:", zap.Error(err), zap.String("from", msgReceive.Sender), zap.String("to", msgReceive.Receiver))
-				return
 			}
 		}
-		return
 	}
 }
 
@@ -215,9 +216,6 @@ func GetMsgLength(conn net.Conn, name string) (uint64, []byte, error) {
 			Logger.Error("An exception occurred when client close ", zap.Error(err), zap.String("client", name))
 			return 0, nil, err
 		} else if err == io.EOF {
-			Logger.Error("Read client message with incorrect length:", zap.Error(err), zap.String("client", name))
-			return 0, nil, err
-		} else {
 			Logger.Error("Read client message with incorrect length:", zap.Error(err), zap.String("client", name))
 			return 0, nil, err
 		}
