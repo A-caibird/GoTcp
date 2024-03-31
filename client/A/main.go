@@ -61,7 +61,7 @@ func main() {
 
 func SendMessage(conn net.Conn, ch *chan int) {
 	for {
-		fmt.Printf("是否需要发送消息(y/n):  ")
+		fmt.Printf("是否需要发送消息(y/n):  \n")
 		var input string
 		_, err2 := fmt.Scanln(&input)
 		if err2 != nil {
@@ -148,8 +148,9 @@ func ReceiveMessage(conn net.Conn) {
 				Logger.Info("disconnect server!", zap.Error(err))
 				return
 			} else if errors.Is(err, io.EOF) {
-				//Logger.Error("No more messages for now!", zap.Error(err))
-				continue
+				Logger.Error("No more messages for now!", zap.Error(err))
+				return
+				//continue
 			}
 		}
 		lens := binary.BigEndian.Uint64(buf)

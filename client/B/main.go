@@ -60,7 +60,7 @@ func main() {
 
 func SendMessage(conn net.Conn, ch *chan int) {
 	for {
-		fmt.Printf("是否需要发送消息(y/n):  ")
+		fmt.Printf("是否需要发送消息(y/n):  \n")
 		var input string
 		_, err2 := fmt.Scanln(&input)
 		if err2 != nil {
@@ -98,11 +98,11 @@ func SendMessage(conn net.Conn, ch *chan int) {
 		case 1:
 			SendTextMsg(conn)
 		case 2:
-			fmt.Println("暂不支持图片消息")
+			fmt.Println("暂不支持图片消息!")
 		case 3:
-			fmt.Println("暂不支持视频消息")
+			fmt.Println("暂不支持视频消息!")
 		default:
-			fmt.Println("输入有误")
+			fmt.Println("无效输入!")
 		}
 	}
 }
@@ -147,8 +147,8 @@ func ReceiveMessage(conn net.Conn) {
 				Logger.Info("disconnect server!", zap.Error(err))
 				return
 			} else if errors.Is(err, io.EOF) {
-				//Logger.Error("No more messages for now!", zap.Error(err))
-				continue
+				Logger.Error("No more messages for now!", zap.Error(err))
+				//continue
 			}
 		}
 		lens := binary.BigEndian.Uint64(buf)
