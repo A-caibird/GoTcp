@@ -73,7 +73,7 @@ func SendMessage(conn net.Conn, ch *chan int) {
 			return // 退出
 		}
 
-		messageTypes := []message.MessageType{
+		messageTypes := []message.MessageTypeTip{
 			{1, "Text"},
 			{2, "Image[png,jpg,jpeg,gif]"},
 			{3, "Video[mp4]"},

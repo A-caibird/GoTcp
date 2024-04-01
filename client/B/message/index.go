@@ -2,6 +2,11 @@ package message
 
 import "time"
 
+type MessageTypeTip struct {
+	Index int64
+	Name  string
+}
+
 type MSG interface {
 	GetSender() string
 	GetReceiver() string
