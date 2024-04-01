@@ -74,7 +74,7 @@ type FileMsg struct {
 	Sender      string    `json:"sender"`
 	Receiver    string    `json:"receiver"`
 	FileName    string    `json:"file_name"`
-	FileContent int64     `json:"file_content"`
+	FileContent []byte    `json:"file_content"`
 	Time        time.Time `json:"time"`
 }
 
